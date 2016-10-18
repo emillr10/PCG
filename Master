@@ -1,0 +1,142 @@
+
+from selenium import webdriver
+import selenium.webdriver.support.ui as ui
+from selenium.webdriver.support.ui import Select
+from selenium.webdriver.common.keys import Keys
+from time import sleep 
+
+
+import csv
+import sys
+import sqlite3
+import re
+
+#Create Database
+db = sqlite3.connect(":memory:")
+cursor = db.cursor()
+
+#Create Table
+cursor.execute('CREATE TABLE data (FormType, ConsumerName, ConsumerNo , ProviderName, ProviderNo, DateReceived, DateUpdated, PDFName, DocumentType, Status , ProgramCode);')
+#Load table with data
+with open('\\Users\Emmiller\\Desktop\\Script\\Master.csv','r') as file:
+	reader = csv.reader(file)
+	cursor.executemany('INSERT INTO data VALUES (?,?,?,?,?,?,?,?,?,?,?)', reader)
+	db.commit()
+
+#Select necessary data
+cursor.execute("SELECT ProviderNo FROM data WHERE FormType = 'VOE' AND ProgramCode = 'Virginia DMAS FI'")
+records = []
+records = cursor.fetchall()
+cursor.execute("SELECT ProgramCode FROM data WHERE FormType = 'VOE'")
+programs = []
+programs = cursor.fetchall()
+cursor.execute("SELECT ProviderName FROM data WHERE FormType = 'VOE' AND ProgramCode = 'Virginia DMAS FI'")
+names = []
+names = cursor.fetchall()
+
+
+db.commit()
+
+#Remove special characters from records list
+records2=[]
+programs2=[]
+names2=[]
+print(records)
+for element in records:
+	for char in element:
+		records2.append(char)
+for element in programs:
+	for char in element:
+		programs2.append(char)
+for element in names:
+	for char in element:
+		names2.append(char)
+
+#QA Data
+print(records2)
+print(len(records2))
+print(records2[0])
+print(names)
+print(names2[0])
+print(len(names2))
+
+#db.commit()
+#db.close()
+
+import shutil, os
+
+#Set download directory
+dirpath = 'C:\\Users\\Emmiller\\Downloads'
+os.chdir(dirpath)
+#Clear Directory
+for root, dirs, files in os.walk(dirpath):
+    for f in files:
+    	os.unlink(os.path.join(root, f))
+    for d in dirs:
+    	shutil.rmtree(os.path.join(root, d))
+
+
+#Retrieve all reports
+def Retrieve(program):
+	#Open Portal and login
+	portal = 'https://fms.publicpartnerships.com/PPLPortal/login.aspx'
+	#E049968 as test case
+	#employer = 'E049968'
+	#employer = input("Please Enter Employer's ID")
+
+	driver = webdriver.Chrome()
+	driver.get(portal)
+
+	#Login
+	sleep(2)
+	driver.find_element_by_id("ctl00_MainBody_txtUserName1").clear()
+	driver.find_element_by_id("ctl00_MainBody_txtUserName1").send_keys("emmiller")
+	driver.find_element_by_id("ctl00_MainBody_txtPassword1").clear()
+	driver.find_element_by_id("ctl00_MainBody_txtPassword1").send_keys("Illinois2016")
+	click = driver.find_element_by_id('ctl00_MainBody_btnLogin1')
+	click.click()
+
+	#Select Program
+	sleep(1.5)
+	#Select(driver.find_element_by_id("ctl00_MainBody_ddUserPrograms")).select_by_visible_text("PA DPW OLTL")
+	Select(driver.find_element_by_id("ctl00_MainBody_ddUserPrograms")).select_by_visible_text(program)
+	#driver.find_element_by_css_selector("option[value=\"157\"]").click()
+	driver.find_element_by_id("ctl00_MainBody_Button1").click()
+
+	#Go to Reporting
+	sleep(1.5)
+	driver.find_element_by_link_text("Reporting").click()
+	sleep(1)
+	driver.get('https://reports.publicpartnerships.com/ReportBuilder/ReportBuilder.aspx?ReportName=Payroll&reportTitle=New%20VOE&SavedReportRequestsId=3040&ReportCategoryID=1')
+	sleep(1)
+
+	#Enter Employer's ID
+	for i in range (len(records2)):
+		driver.find_element_by_id("2$3").clear()
+		driver.find_element_by_id("2$3").send_keys(records2[i])
+	#Download Report
+		driver.find_element_by_id("ctl00_ContentPlaceHolder1_btnDownloadExcel").click()
+
+	sleep(10)
+
+Retrieve('VA DMAS FI Program')
+
+
+#Create Folder
+#os.mkdir("Reports")
+print(os.path.exists('C:\\Users\\Emmiller\\Downloads\\Reports'))
+
+#Organize files by date modified
+a = [s for s in os.listdir(dirpath)
+if os.path.isfile(os.path.join(dirpath, s))]
+a.sort(key=lambda s: os.path.getmtime(os.path.join(dirpath, s)))
+print(a)
+
+#rename the files, and move them to destination
+for i in range (len(a)):
+	shutil.move(a[i], "Q:\\PPLBusiness\\Compliance Team\\02. Team Folders\\Medford\\Manny\\DataDumpTest\\%s %s VOE WAGES .xls" % (names2[i] , records2[i]))
+
+
+
+
+
